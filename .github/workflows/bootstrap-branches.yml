@@ -1,0 +1,63 @@
+name: Bootstrap branches and protections
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gh
+          gh --version
+
+      - name: Auth gh with GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "GitHub CLI is ready to use with GITHUB_TOKEN"
+
+      - name: Create develop branch if missing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          default_branch=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+          if [ "$default_branch" != "main" ]; then
+            echo "Default branch is $default_branch, expected main"; exit 1
+          fi
+
+          # If develop exists, skip; else create from main
+          if git ls-remote --heads origin dev | grep -q dev; then
+            echo "develop already exists"
+          else
+            git fetch origin main
+            git branch dev origin/main
+            git push origin dev
+            echo "Created develop branch"
+          fi
+
+      - name: Optionally create initial release branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --heads origin rel/0.1.0 | grep -q rel/0.1.0; then
+            echo "release/0.1.0 already exists"
+          else
+            git fetch origin main
+            git branch rel/0.1.0 origin/main
+            git push origin rel/0.1.0
+            echo "Created rel/0.1.0 branch"
+          fi

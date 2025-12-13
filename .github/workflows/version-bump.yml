@@ -1,0 +1,157 @@
+# .github/workflows/version-bump.yml
+name: Auto Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.ACCESS_TOKEN || github.token}}
+          fetch-depth: 0  # Fetch full history for proper git operations
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install requirements
+        run: pip install --upgrade pip
+      - name: Install Requests
+        run: pip install requests
+
+      - name: Bump version
+        id: bump_version
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          MERGE_COMMIT_MSG: ${{ github.event.pull_request.merge_commit_message }}
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: | 
+          python -c """
+          #!/usr/bin/env python3
+          import re
+          import os
+          import subprocess
+
+          # Read current version
+          with open('VERSION', 'r') as f:
+              version = f.read().strip()
+
+          major, minor, patch = map(int, version.split('.'))
+
+          # Get PR info from env
+          pr_number = os.environ['PR_NUMBER']
+          pr_title = os.environ['PR_TITLE'].lower()
+          merge_commit_msg = os.environ.get('MERGE_COMMIT_MSG', '').lower()
+
+          print(f'Processing PR #{pr_number}')
+          print(f'PR Title: {pr_title}')
+          print(f'Merge commit message: {merge_commit_msg}')
+
+          # Process all commits in the PR to determine version bump
+          try:
+              import requests
+              token = os.environ.get('ACCESS_TOKEN', '')
+              repo = os.environ.get('GITHUB_REPOSITORY', '')
+              
+              if token and repo:
+                  headers = {'Authorization': f'token {token}'}
+                  api_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}/commits'
+                  print(f'Fetching commits from: {api_url}')
+                  r = requests.get(api_url, headers=headers)
+                  if r.ok:
+                      commits = r.json()
+                      print(f'Found {len(commits)} commits in PR #{pr_number}')
+                      
+                      # Process commits in order
+                      for i, commit in enumerate(commits):
+                          commit_msg = commit.get('commit', {}).get('message', '').lower()
+                          print(f'Commit {i+1}: {commit_msg[:50]}...')
+                          
+                          # Check for version bump tags in commit message
+                          if '[major]' in commit_msg:
+                              print(f'  -> Found [major] tag, resetting to major version')
+                              major += 1
+                              minor = 0
+                              patch = 0
+                          elif '[minor]' in commit_msg:
+                              print(f'  -> Found [minor] tag, resetting to minor version')
+                              minor += 1
+                              patch = 0
+                          elif '[patch]' in commit_msg:
+                              print(f'  -> Found [patch] tag, incrementing patch')
+                              patch += 1
+                          else:
+                              # Default: increment patch for regular commits
+                              patch += 1
+                              print(f'  -> Regular commit, incrementing patch to {patch}')
+                      
+                      print(f'Final version after processing commits: {major}.{minor}.{patch}')
+                  else:
+                      print(f'GitHub API request failed: {r.status_code} - {r.text}')
+                      # Fallback to old logic
+                      if '[major]' in pr_title or '[major]' in merge_commit_msg:
+                          major += 1
+                          minor = 0
+                          patch = 0
+                      elif '[minor]' in pr_title or '[minor]' in merge_commit_msg:
+                          minor += 1
+                          patch = 0
+                      else:
+                          patch += 1
+              else:
+                  print('Missing ACCESS_TOKEN or GITHUB_REPOSITORY environment variables')
+                  # Fallback to old logic
+                  if '[major]' in pr_title or '[major]' in merge_commit_msg:
+                      major += 1
+                      minor = 0
+                      patch = 0
+                  elif '[minor]' in pr_title or '[minor]' in merge_commit_msg:
+                      minor += 1
+                      patch = 0
+                  else:
+                      patch += 1
+          except Exception as e:
+              print(f'Error processing commits: {e}')
+              # Fallback to old logic
+              if '[major]' in pr_title or '[major]' in merge_commit_msg:
+                  major += 1
+                  minor = 0
+                  patch = 0
+              elif '[minor]' in pr_title or '[minor]' in merge_commit_msg:
+                  minor += 1
+                  patch = 0
+              else:
+                  patch += 1
+
+          new_version = f'{major}.{minor}.{patch}'
+
+          print(f'Version bump: {version} -> {new_version}')
+
+          # Write new version
+          with open('VERSION', 'w') as f:
+              f.write(new_version)
+
+          print(f'new_version={new_version}', file=open(os.environ['GITHUB_OUTPUT'], 'a'))
+          """
+      - name: Commit and push version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.new_version }}"
+          git push
+
+      - name: Create Git tag
+        run: |
+          git tag v${{ steps.bump_version.outputs.new_version }}
+          git push origin v${{ steps.bump_version.outputs.new_version }}
