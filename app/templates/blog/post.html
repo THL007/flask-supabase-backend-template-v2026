@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<article>
+    <h1>{{ post.title }}</h1>
+    <p class="meta">
+        By {{ post.author }} on {{ post.created_at[:10] }}
+        {% if post.tags %}
+        | Tags: {{ post.tags|join(", ") }}
+        {% endif %}
+    </p>
+    
+    {% if post.html_content %}
+    <div class="content">
+        {{ post.html_content|safe }}
+    </div>
+    {% elif post.content %}
+    <div class="content">
+        {{ post.content|safe }}
+    </div>
+    {% else %}
+    <p>Content not available.</p>
+    {% endif %}
+</article>
+
+<div style="margin-top: 30px;">
+    <a href="/blog">← Back to Blog</a>
+</div>
+{% endblock %}
+

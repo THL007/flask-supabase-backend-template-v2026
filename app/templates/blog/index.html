@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Blog{% endblock %}
+
+{% block content %}
+<h1>Blog Posts</h1>
+
+{% if posts %}
+    <div class="posts">
+        {% for post in posts %}
+        <article style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <h2><a href="/blog/{{ post.slug }}">{{ post.title }}</a></h2>
+            <p class="meta">
+                By {{ post.author }} on {{ post.created_at[:10] }}
+            </p>
+            {% if post.excerpt %}
+            <p>{{ post.excerpt }}</p>
+            {% endif %}
+            <a href="/blog/{{ post.slug }}">Read more →</a>
+        </article>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No blog posts found.</p>
+{% endif %}
+{% endblock %}
+

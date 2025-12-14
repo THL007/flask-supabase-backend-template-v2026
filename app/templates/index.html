@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Welcome to Flask Supabase Backend</h1>
+<p>This is a template backend using Flask, Supabase, Redis, and Celery.</p>
+
+<h2>Features</h2>
+<ul>
+    <li>Flask with Blueprints</li>
+    <li>Supabase (Postgres, Auth, Storage, Realtime)</li>
+    <li>Flask-Smorest for REST API</li>
+    <li>Redis for caching and rate limiting</li>
+    <li>Celery for async tasks</li>
+    <li>Markdown-backed blog system</li>
+    <li>Sentry and OpenTelemetry monitoring</li>
+</ul>
+
+<h2>API Endpoints</h2>
+<ul>
+    <li><a href="/api/v1/health">GET /api/v1/health</a> - Health check</li>
+    <li><a href="/api/v1/protected">GET /api/v1/protected</a> - Protected endpoint (requires auth)</li>
+    <li><a href="/blog">Blog</a> - Blog listing</li>
+</ul>
+
+<h2>Documentation</h2>
+<p><a href="/api/swagger-ui">Swagger UI</a> - Interactive API documentation</p>
+{% endblock %}
+
